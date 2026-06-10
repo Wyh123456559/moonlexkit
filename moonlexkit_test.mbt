@@ -98,3 +98,22 @@ test "scan with diagnostics accepts clean input" {
   let result = @moonlexkit.scan_with_diagnostics("name = 42")
   assert_false(result.has_errors())
 }
+
+///|
+test "token stream consumes expected kind" {
+  let stream = @moonlexkit.TokenStream::new(@moonlexkit.scan("sum 10"))
+  assert_true(stream.matches_kind(Identifier))
+  let (ok, token, next) = stream.consume_kind(Identifier)
+  assert_true(ok)
+  assert_eq(token.text, "sum")
+  assert_true(next.matches_kind(Number))
+}
+
+///|
+test "token stream keeps position when consume fails" {
+  let stream = @moonlexkit.TokenStream::new(@moonlexkit.scan("sum"))
+  let (ok, token, next) = stream.consume_kind(Number)
+  assert_false(ok)
+  assert_eq(token.text, "sum")
+  assert_eq(next.index, stream.index)
+}

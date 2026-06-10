@@ -110,6 +110,24 @@ pub fn TokenStream::is_at_end(self : TokenStream) -> Bool {
 }
 
 ///|
+pub fn TokenStream::matches_kind(self : TokenStream, kind : TokenKind) -> Bool {
+  self.current().kind == kind
+}
+
+///|
+pub fn TokenStream::consume_kind(
+  self : TokenStream,
+  kind : TokenKind,
+) -> (Bool, Token, TokenStream) {
+  let token = self.current()
+  if token.kind == kind {
+    (true, token, self.advance())
+  } else {
+    (false, token, self)
+  }
+}
+
+///|
 pub fn Diagnostic::new(message : String, start : Int, end : Int) -> Diagnostic {
   { message, start, end }
 }
