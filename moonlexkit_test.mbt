@@ -146,9 +146,9 @@ test "line comments are skipped by default" {
 
 ///|
 test "token kind names are stable for serialization" {
-  assert_eq(Identifier.name(), "identifier")
-  assert_eq(Comment.name(), "comment")
-  assert_eq(End.name(), "end")
+  assert_eq(@moonlexkit.TokenKind::Identifier.name(), "identifier")
+  assert_eq(@moonlexkit.TokenKind::Comment.name(), "comment")
+  assert_eq(@moonlexkit.TokenKind::End.name(), "end")
 }
 
 ///|
