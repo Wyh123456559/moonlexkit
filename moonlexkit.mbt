@@ -123,9 +123,7 @@ pub fn is_identifier_part(ch : Char) -> Bool {
 
 ///|
 fn substring(source : String, start : Int, end : Int) -> String {
-  let buf = StringBuilder(size_hint=end - start)
-  buf.write_substring(source, start, end - start)
-  buf.to_string()
+  source.unsafe_substring(start~, end~)
 }
 
 ///|
