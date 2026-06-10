@@ -43,3 +43,30 @@ test "lexer config has predictable defaults" {
   assert_false(config.keep_trivia)
   assert_true(config.emit_end)
 }
+
+///|
+test "scan identifiers numbers symbols and end token" {
+  let tokens = @moonlexkit.scan("foo 123 + bar")
+  assert_eq(tokens.length(), 5)
+  assert_true(tokens[0] == @moonlexkit.Token::new(Identifier, "foo", 0, 3))
+  assert_true(tokens[1] == @moonlexkit.Token::new(Number, "123", 4, 7))
+  assert_true(tokens[2] == @moonlexkit.Token::new(Symbol, "+", 8, 9))
+  assert_true(tokens[3] == @moonlexkit.Token::new(Identifier, "bar", 10, 13))
+  assert_true(tokens[4].kind == End)
+}
+
+///|
+test "scan can preserve whitespace trivia" {
+  let config = @moonlexkit.LexerConfig::new(keep_trivia=true)
+  let tokens = @moonlexkit.scan("a  b", config~)
+  assert_eq(tokens.length(), 4)
+  assert_true(tokens[1] == @moonlexkit.Token::new(Whitespace, "  ", 1, 3))
+}
+
+///|
+test "scan can omit end token" {
+  let config = @moonlexkit.LexerConfig::new(emit_end=false)
+  let tokens = @moonlexkit.scan("x", config~)
+  assert_eq(tokens.length(), 1)
+  assert_true(tokens[0].kind == Identifier)
+}
