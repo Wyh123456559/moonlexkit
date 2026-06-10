@@ -125,3 +125,21 @@ test "scan recognizes common two character symbols" {
   assert_eq(tokens[3].text, "->")
   assert_true(tokens[1].kind == Symbol)
 }
+
+///|
+test "line comments are trivia and can be preserved" {
+  let config = @moonlexkit.LexerConfig::new(keep_trivia=true)
+  let tokens = @moonlexkit.scan("a // note\nb", config~)
+  assert_true(tokens[1].kind == Whitespace)
+  assert_true(tokens[2].kind == Comment)
+  assert_true(tokens[2].is_trivia())
+  assert_eq(tokens[2].text, "// note")
+}
+
+///|
+test "line comments are skipped by default" {
+  let tokens = @moonlexkit.scan("a // note\nb")
+  assert_eq(tokens.length(), 3)
+  assert_eq(tokens[0].text, "a")
+  assert_eq(tokens[1].text, "b")
+}

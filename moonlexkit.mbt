@@ -4,6 +4,7 @@ pub(all) enum TokenKind {
   Number
   Symbol
   Whitespace
+  Comment
   Unknown
   End
 } derive(Eq, Debug)
@@ -63,7 +64,7 @@ pub fn Token::length(self : Token) -> Int {
 
 ///|
 pub fn Token::is_trivia(self : Token) -> Bool {
-  self.kind == Whitespace
+  self.kind == Whitespace || self.kind == Comment
 }
 
 ///|
@@ -193,6 +194,26 @@ fn is_two_char_symbol(source : String, index : Int) -> Bool {
 }
 
 ///|
+fn is_line_comment_start(source : String, index : Int) -> Bool {
+  match (source.get_char(index), source.get_char(index + 1)) {
+    (Some('/'), Some('/')) => true
+    _ => false
+  }
+}
+
+///|
+fn scan_line_comment(source : String, start : Int) -> Int {
+  let mut index = start
+  while index < source.length() {
+    match source.get_char(index) {
+      Some('\n' | '\r') => return index
+      _ => index = index + 1
+    }
+  }
+  index
+}
+
+///|
 pub fn scan(
   source : String,
   config? : LexerConfig = LexerConfig::default(),
@@ -222,6 +243,15 @@ pub fn scan(
         tokens.push(
           Token::new(Number, substring(source, index, end), index, end),
         )
+        index = end
+      }
+      Some(_) if is_line_comment_start(source, index) => {
+        let end = scan_line_comment(source, index)
+        if config.keep_trivia {
+          tokens.push(
+            Token::new(Comment, substring(source, index, end), index, end),
+          )
+        }
         index = end
       }
       Some(_) if is_two_char_symbol(source, index) => {
