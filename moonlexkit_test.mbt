@@ -70,3 +70,16 @@ test "scan can omit end token" {
   assert_eq(tokens.length(), 1)
   assert_true(tokens[0].kind == Identifier)
 }
+
+///|
+test "token stream advances without losing end safety" {
+  let tokens = @moonlexkit.scan("left right")
+  let stream = @moonlexkit.TokenStream::new(tokens)
+  assert_eq(stream.current().text, "left")
+  let stream = stream.advance()
+  assert_eq(stream.current().text, "right")
+  let stream = stream.advance()
+  assert_true(stream.is_at_end())
+  let stream = stream.advance().advance()
+  assert_true(stream.is_at_end())
+}

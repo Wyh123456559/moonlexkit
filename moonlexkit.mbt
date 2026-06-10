@@ -23,6 +23,12 @@ pub(all) struct LexerConfig {
 } derive(Eq, Debug)
 
 ///|
+pub(all) struct TokenStream {
+  tokens : Array[Token]
+  index : Int
+} derive(Eq, Debug)
+
+///|
 pub fn Token::new(
   kind : TokenKind,
   text : String,
@@ -30,6 +36,11 @@ pub fn Token::new(
   end : Int,
 ) -> Token {
   { kind, text, start, end }
+}
+
+///|
+pub fn Token::end_at(offset : Int) -> Token {
+  Token::new(End, "", offset, offset)
 }
 
 ///|
@@ -53,6 +64,36 @@ pub fn LexerConfig::new(
 ///|
 pub fn LexerConfig::default() -> LexerConfig {
   LexerConfig::new()
+}
+
+///|
+pub fn TokenStream::new(tokens : Array[Token]) -> TokenStream {
+  { tokens, index: 0 }
+}
+
+///|
+pub fn TokenStream::current(self : TokenStream) -> Token {
+  if self.index < self.tokens.length() {
+    self.tokens[self.index]
+  } else if self.tokens.length() > 0 {
+    Token::end_at(self.tokens[self.tokens.length() - 1].end)
+  } else {
+    Token::end_at(0)
+  }
+}
+
+///|
+pub fn TokenStream::advance(self : TokenStream) -> TokenStream {
+  if self.index < self.tokens.length() {
+    { tokens: self.tokens, index: self.index + 1 }
+  } else {
+    self
+  }
+}
+
+///|
+pub fn TokenStream::is_at_end(self : TokenStream) -> Bool {
+  self.current().kind == End
 }
 
 ///|
