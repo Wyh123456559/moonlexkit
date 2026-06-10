@@ -180,6 +180,19 @@ fn scan_while(source : String, start : Int, accepts : (Char) -> Bool) -> Int {
 }
 
 ///|
+fn is_two_char_symbol(source : String, index : Int) -> Bool {
+  match (source.get_char(index), source.get_char(index + 1)) {
+    (Some('='), Some('=')) => true
+    (Some('!'), Some('=')) => true
+    (Some('<'), Some('=')) => true
+    (Some('>'), Some('=')) => true
+    (Some('-'), Some('>')) => true
+    (Some('='), Some('>')) => true
+    _ => false
+  }
+}
+
+///|
 pub fn scan(
   source : String,
   config? : LexerConfig = LexerConfig::default(),
@@ -211,6 +224,13 @@ pub fn scan(
         )
         index = end
       }
+      Some(_) if is_two_char_symbol(source, index) => {
+        let end = index + 2
+        tokens.push(
+          Token::new(Symbol, substring(source, index, end), index, end),
+        )
+        index = end
+      }
       Some(ch) if ch
         is ('('
         | ')'
@@ -226,7 +246,10 @@ pub fn scan(
         | '-'
         | '*'
         | '/'
-        | '=') => {
+        | '='
+        | '<'
+        | '>'
+        | '!') => {
         let end = index + 1
         tokens.push(
           Token::new(Symbol, substring(source, index, end), index, end),

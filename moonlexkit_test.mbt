@@ -117,3 +117,11 @@ test "token stream keeps position when consume fails" {
   assert_eq(token.text, "sum")
   assert_eq(next.index, stream.index)
 }
+
+///|
+test "scan recognizes common two character symbols" {
+  let tokens = @moonlexkit.scan("a == b -> c")
+  assert_eq(tokens[1].text, "==")
+  assert_eq(tokens[3].text, "->")
+  assert_true(tokens[1].kind == Symbol)
+}
