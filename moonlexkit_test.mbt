@@ -143,3 +143,19 @@ test "line comments are skipped by default" {
   assert_eq(tokens[0].text, "a")
   assert_eq(tokens[1].text, "b")
 }
+
+///|
+test "token kind names are stable for serialization" {
+  assert_eq(Identifier.name(), "identifier")
+  assert_eq(Comment.name(), "comment")
+  assert_eq(End.name(), "end")
+}
+
+///|
+test "tokens can be exported as json" {
+  let tokens = @moonlexkit.scan("a = 1")
+  let json = @moonlexkit.tokens_to_json(tokens)
+  assert_true(json.contains("\"kind\":\"identifier\""))
+  assert_true(json.contains("\"text\":\"a\""))
+  assert_true(json.contains("\"kind\":\"end\""))
+}

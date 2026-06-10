@@ -68,6 +68,19 @@ pub fn Token::is_trivia(self : Token) -> Bool {
 }
 
 ///|
+pub fn TokenKind::name(self : TokenKind) -> String {
+  match self {
+    Identifier => "identifier"
+    Number => "number"
+    Symbol => "symbol"
+    Whitespace => "whitespace"
+    Comment => "comment"
+    Unknown => "unknown"
+    End => "end"
+  }
+}
+
+///|
 pub fn LexerConfig::new(
   keep_trivia? : Bool = false,
   emit_end? : Bool = true,
@@ -136,6 +149,35 @@ pub fn Diagnostic::new(message : String, start : Int, end : Int) -> Diagnostic {
 ///|
 pub fn LexResult::has_errors(self : LexResult) -> Bool {
   self.diagnostics.length() > 0
+}
+
+///|
+fn escape_json(value : String) -> String {
+  value
+  .replace(old="\\", new="\\\\")
+  .replace(old="\"", new="\\\"")
+  .replace(old="\n", new="\\n")
+  .replace(old="\r", new="\\r")
+  .replace(old="\t", new="\\t")
+}
+
+///|
+pub fn Token::to_json(self : Token) -> String {
+  "{\"kind\":\"\{self.kind.name()}\",\"text\":\"\{escape_json(self.text)}\",\"start\":\{self.start},\"end\":\{self.end}}"
+}
+
+///|
+pub fn tokens_to_json(tokens : Array[Token]) -> String {
+  let buf = StringBuilder()
+  buf.write_char('[')
+  for i = 0; i < tokens.length(); i = i + 1 {
+    if i > 0 {
+      buf.write_char(',')
+    }
+    buf.write_string(tokens[i].to_json())
+  }
+  buf.write_char(']')
+  buf.to_string()
 }
 
 ///|
