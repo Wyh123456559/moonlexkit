@@ -1,0 +1,7 @@
+// import {
+//   "Wyh123456559/moonlexkit" @lib,
+// }
+
+options(
+  "is-main": true,
+)
