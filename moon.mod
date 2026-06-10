@@ -19,6 +19,6 @@ repository = "https://github.com/Wyh123456559/moonlexkit"
 
 license = "Apache-2.0"
 
-keywords = ["lexer", "parser", "tokenizer", "diagnostics"]
+keywords = [ "lexer", "parser", "tokenizer", "diagnostics" ]
 
 description = "A MoonBit lexical scanning and lightweight parsing toolkit."
