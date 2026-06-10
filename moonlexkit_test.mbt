@@ -83,3 +83,18 @@ test "token stream advances without losing end safety" {
   let stream = stream.advance().advance()
   assert_true(stream.is_at_end())
 }
+
+///|
+test "scan with diagnostics reports unknown characters" {
+  let result = @moonlexkit.scan_with_diagnostics("ok @")
+  assert_true(result.has_errors())
+  assert_eq(result.diagnostics.length(), 1)
+  assert_eq(result.diagnostics[0].message, "unknown character")
+  assert_eq(result.diagnostics[0].start, 3)
+}
+
+///|
+test "scan with diagnostics accepts clean input" {
+  let result = @moonlexkit.scan_with_diagnostics("name = 42")
+  assert_false(result.has_errors())
+}

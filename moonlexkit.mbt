@@ -29,6 +29,19 @@ pub(all) struct TokenStream {
 } derive(Eq, Debug)
 
 ///|
+pub(all) struct Diagnostic {
+  message : String
+  start : Int
+  end : Int
+} derive(Eq, Debug)
+
+///|
+pub(all) struct LexResult {
+  tokens : Array[Token]
+  diagnostics : Array[Diagnostic]
+} derive(Eq, Debug)
+
+///|
 pub fn Token::new(
   kind : TokenKind,
   text : String,
@@ -94,6 +107,16 @@ pub fn TokenStream::advance(self : TokenStream) -> TokenStream {
 ///|
 pub fn TokenStream::is_at_end(self : TokenStream) -> Bool {
   self.current().kind == End
+}
+
+///|
+pub fn Diagnostic::new(message : String, start : Int, end : Int) -> Diagnostic {
+  { message, start, end }
+}
+
+///|
+pub fn LexResult::has_errors(self : LexResult) -> Bool {
+  self.diagnostics.length() > 0
 }
 
 ///|
@@ -205,4 +228,21 @@ pub fn scan(
     tokens.push(Token::new(End, "", source.length(), source.length()))
   }
   tokens
+}
+
+///|
+pub fn scan_with_diagnostics(
+  source : String,
+  config? : LexerConfig = LexerConfig::default(),
+) -> LexResult {
+  let tokens = scan(source, config~)
+  let diagnostics : Array[Diagnostic] = []
+  for i = 0; i < tokens.length(); i = i + 1 {
+    if tokens[i].kind == Unknown {
+      diagnostics.push(
+        Diagnostic::new("unknown character", tokens[i].start, tokens[i].end),
+      )
+    }
+  }
+  { tokens, diagnostics }
 }
