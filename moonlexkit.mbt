@@ -17,6 +17,12 @@ pub(all) struct Token {
 } derive(Eq, Debug)
 
 ///|
+pub(all) struct LexerConfig {
+  keep_trivia : Bool
+  emit_end : Bool
+} derive(Eq, Debug)
+
+///|
 pub fn Token::new(
   kind : TokenKind,
   text : String,
@@ -34,6 +40,19 @@ pub fn Token::length(self : Token) -> Int {
 ///|
 pub fn Token::is_trivia(self : Token) -> Bool {
   self.kind == Whitespace
+}
+
+///|
+pub fn LexerConfig::new(
+  keep_trivia? : Bool = false,
+  emit_end? : Bool = true,
+) -> LexerConfig {
+  { keep_trivia, emit_end }
+}
+
+///|
+pub fn LexerConfig::default() -> LexerConfig {
+  LexerConfig::new()
 }
 
 ///|

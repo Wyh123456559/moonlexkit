@@ -36,3 +36,10 @@ test "identifier classifier accepts underscore and digits after first char" {
   assert_true(@moonlexkit.is_identifier_part('9'))
   assert_false(@moonlexkit.is_identifier_start('9'))
 }
+
+///|
+test "lexer config has predictable defaults" {
+  let config = @moonlexkit.LexerConfig::default()
+  assert_false(config.keep_trivia)
+  assert_true(config.emit_end)
+}
