@@ -1,6 +1,6 @@
-// import {
-//   "Wyh123456559/moonlexkit" @lib,
-// }
+import {
+  "Wyh123456559/moonlexkit" @lex,
+}
 
 options(
   "is-main": true,
