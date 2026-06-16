@@ -2,6 +2,7 @@
 pub(all) enum TokenKind {
   Identifier
   Number
+  StringLiteral
   Symbol
   Whitespace
   Comment
@@ -15,6 +16,13 @@ pub(all) struct Token {
   text : String
   start : Int
   end : Int
+} derive(Eq, Debug)
+
+///|
+pub(all) struct SourcePosition {
+  offset : Int
+  line : Int
+  column : Int
 } derive(Eq, Debug)
 
 ///|
@@ -40,6 +48,29 @@ pub(all) struct Diagnostic {
 pub(all) struct LexResult {
   tokens : Array[Token]
   diagnostics : Array[Diagnostic]
+} derive(Eq, Debug)
+
+///|
+pub(all) struct TokenStats {
+  total : Int
+  identifiers : Int
+  numbers : Int
+  strings : Int
+  symbols : Int
+  trivia : Int
+  unknowns : Int
+} derive(Eq, Debug)
+
+///|
+pub(all) struct ScanSummary {
+  tokens : Int
+  diagnostics : Int
+  identifiers : Int
+  numbers : Int
+  strings : Int
+  comments : Int
+  unknowns : Int
+  lines : Int
 } derive(Eq, Debug)
 
 ///|
@@ -72,12 +103,18 @@ pub fn TokenKind::name(self : TokenKind) -> String {
   match self {
     Identifier => "identifier"
     Number => "number"
+    StringLiteral => "string"
     Symbol => "symbol"
     Whitespace => "whitespace"
     Comment => "comment"
     Unknown => "unknown"
     End => "end"
   }
+}
+
+///|
+pub fn SourcePosition::to_json(self : SourcePosition) -> String {
+  "{\"offset\":\{self.offset},\"line\":\{self.line},\"column\":\{self.column}}"
 }
 
 ///|
@@ -152,13 +189,75 @@ pub fn LexResult::has_errors(self : LexResult) -> Bool {
 }
 
 ///|
+pub fn LexResult::summary(self : LexResult, source : String) -> ScanSummary {
+  let stats = TokenStats::from_tokens(self.tokens)
+  {
+    tokens: stats.total,
+    diagnostics: self.diagnostics.length(),
+    identifiers: stats.identifiers,
+    numbers: stats.numbers,
+    strings: stats.strings,
+    comments: count_kind(self.tokens, Comment),
+    unknowns: stats.unknowns,
+    lines: count_lines(source),
+  }
+}
+
+///|
+pub fn ScanSummary::to_json(self : ScanSummary) -> String {
+  "{\"tokens\":\{self.tokens},\"diagnostics\":\{self.diagnostics},\"identifiers\":\{self.identifiers},\"numbers\":\{self.numbers},\"strings\":\{self.strings},\"comments\":\{self.comments},\"unknowns\":\{self.unknowns},\"lines\":\{self.lines}}"
+}
+
+///|
+pub fn TokenStats::from_tokens(tokens : Array[Token]) -> TokenStats {
+  let mut identifiers = 0
+  let mut numbers = 0
+  let mut strings = 0
+  let mut symbols = 0
+  let mut trivia = 0
+  let mut unknowns = 0
+  for token in tokens {
+    match token.kind {
+      Identifier => identifiers = identifiers + 1
+      Number => numbers = numbers + 1
+      StringLiteral => strings = strings + 1
+      Symbol => symbols = symbols + 1
+      Whitespace | Comment => trivia = trivia + 1
+      Unknown => unknowns = unknowns + 1
+      End => ()
+    }
+  }
+  {
+    total: tokens.length(),
+    identifiers,
+    numbers,
+    strings,
+    symbols,
+    trivia,
+    unknowns,
+  }
+}
+
+///|
+pub fn TokenStats::to_json(self : TokenStats) -> String {
+  "{\"total\":\{self.total},\"identifiers\":\{self.identifiers},\"numbers\":\{self.numbers},\"strings\":\{self.strings},\"symbols\":\{self.symbols},\"trivia\":\{self.trivia},\"unknowns\":\{self.unknowns}}"
+}
+
+///|
 fn escape_json(value : String) -> String {
-  value
-  .replace(old="\\", new="\\\\")
-  .replace(old="\"", new="\\\"")
-  .replace(old="\n", new="\\n")
-  .replace(old="\r", new="\\r")
-  .replace(old="\t", new="\\t")
+  let buf = StringBuilder()
+  for i = 0; i < value.length(); i = i + 1 {
+    match value.get_char(i) {
+      Some('\\') => buf.write_string("\\\\")
+      Some('"') => buf.write_string("\\\"")
+      Some('\n') => buf.write_string("\\n")
+      Some('\r') => buf.write_string("\\r")
+      Some('\t') => buf.write_string("\\t")
+      Some(ch) => buf.write_char(ch)
+      None => ()
+    }
+  }
+  buf.to_string()
 }
 
 ///|
@@ -203,6 +302,46 @@ pub fn is_identifier_start(ch : Char) -> Bool {
 ///|
 pub fn is_identifier_part(ch : Char) -> Bool {
   is_identifier_start(ch) || is_ascii_digit(ch)
+}
+
+///|
+pub fn count_lines(source : String) -> Int {
+  let mut lines = 1
+  for i = 0; i < source.length(); i = i + 1 {
+    match source.get_char(i) {
+      Some('\n') => lines = lines + 1
+      _ => ()
+    }
+  }
+  lines
+}
+
+///|
+pub fn position_at(source : String, offset : Int) -> SourcePosition {
+  let safe_offset = if offset < 0 {
+    0
+  } else if offset > source.length() {
+    source.length()
+  } else {
+    offset
+  }
+  let mut line = 1
+  let mut column = 1
+  for i = 0; i < safe_offset; i = i + 1 {
+    match source.get_char(i) {
+      Some('\n') => {
+        line = line + 1
+        column = 1
+      }
+      _ => column = column + 1
+    }
+  }
+  { offset: safe_offset, line, column }
+}
+
+///|
+pub fn Token::start_position(self : Token, source : String) -> SourcePosition {
+  position_at(source, self.start)
 }
 
 ///|
@@ -256,6 +395,107 @@ fn scan_line_comment(source : String, start : Int) -> Int {
 }
 
 ///|
+fn scan_string_literal(source : String, start : Int) -> Int {
+  let mut index = start + 1
+  let mut escaped = false
+  while index < source.length() {
+    match source.get_char(index) {
+      Some(_) if escaped => {
+        escaped = false
+        index = index + 1
+      }
+      Some('\\') => {
+        escaped = true
+        index = index + 1
+      }
+      Some('"') => return index + 1
+      _ => index = index + 1
+    }
+  }
+  index
+}
+
+///|
+fn token_ends_with_quote(token : Token) -> Bool {
+  if token.text.length() <= 1 {
+    false
+  } else {
+    match token.text.get_char(token.text.length() - 1) {
+      Some('"') => true
+      _ => false
+    }
+  }
+}
+
+///|
+fn count_kind(tokens : Array[Token], kind : TokenKind) -> Int {
+  let mut count = 0
+  for token in tokens {
+    if token.kind == kind {
+      count = count + 1
+    }
+  }
+  count
+}
+
+///|
+fn add_balance_diagnostics(
+  tokens : Array[Token],
+  diagnostics : Array[Diagnostic],
+) -> Unit {
+  let mut parens = 0
+  let mut braces = 0
+  let mut brackets = 0
+  for token in tokens {
+    if token.kind == Symbol {
+      match token.text {
+        "(" => parens = parens + 1
+        ")" =>
+          if parens > 0 {
+            parens = parens - 1
+          } else {
+            diagnostics.push(
+              Diagnostic::new("unmatched closing paren", token.start, token.end),
+            )
+          }
+        "{" => braces = braces + 1
+        "}" =>
+          if braces > 0 {
+            braces = braces - 1
+          } else {
+            diagnostics.push(
+              Diagnostic::new("unmatched closing brace", token.start, token.end),
+            )
+          }
+        "[" => brackets = brackets + 1
+        "]" =>
+          if brackets > 0 {
+            brackets = brackets - 1
+          } else {
+            diagnostics.push(
+              Diagnostic::new(
+                "unmatched closing bracket",
+                token.start,
+                token.end,
+              ),
+            )
+          }
+        _ => ()
+      }
+    }
+  }
+  if parens > 0 {
+    diagnostics.push(Diagnostic::new("unclosed paren", 0, 0))
+  }
+  if braces > 0 {
+    diagnostics.push(Diagnostic::new("unclosed brace", 0, 0))
+  }
+  if brackets > 0 {
+    diagnostics.push(Diagnostic::new("unclosed bracket", 0, 0))
+  }
+}
+
+///|
 pub fn scan(
   source : String,
   config? : LexerConfig = LexerConfig::default(),
@@ -284,6 +524,13 @@ pub fn scan(
         let end = scan_while(source, index, is_ascii_digit)
         tokens.push(
           Token::new(Number, substring(source, index, end), index, end),
+        )
+        index = end
+      }
+      Some('"') => {
+        let end = scan_string_literal(source, index)
+        tokens.push(
+          Token::new(StringLiteral, substring(source, index, end), index, end),
         )
         index = end
       }
@@ -355,7 +602,17 @@ pub fn scan_with_diagnostics(
       diagnostics.push(
         Diagnostic::new("unknown character", tokens[i].start, tokens[i].end),
       )
+    } else if tokens[i].kind == StringLiteral &&
+      !token_ends_with_quote(tokens[i]) {
+      diagnostics.push(
+        Diagnostic::new(
+          "unterminated string literal",
+          tokens[i].start,
+          tokens[i].end,
+        ),
+      )
     }
   }
+  add_balance_diagnostics(tokens, diagnostics)
   { tokens, diagnostics }
 }

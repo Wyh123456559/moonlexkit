@@ -56,6 +56,15 @@ test "scan identifiers numbers symbols and end token" {
 }
 
 ///|
+test "scan string literals and escaped quotes" {
+  let tokens = @moonlexkit.scan("name = \"moon\\\"bit\"")
+  assert_eq(tokens.length(), 4)
+  assert_true(tokens[2].kind == @moonlexkit.TokenKind::StringLiteral)
+  assert_eq(tokens[2].text, "\"moon\\\"bit\"")
+  assert_eq(@moonlexkit.TokenKind::StringLiteral.name(), "string")
+}
+
+///|
 test "scan can preserve whitespace trivia" {
   let config = @moonlexkit.LexerConfig::new(keep_trivia=true)
   let tokens = @moonlexkit.scan("a  b", config~)
@@ -91,6 +100,20 @@ test "scan with diagnostics reports unknown characters" {
   assert_eq(result.diagnostics.length(), 1)
   assert_eq(result.diagnostics[0].message, "unknown character")
   assert_eq(result.diagnostics[0].start, 3)
+}
+
+///|
+test "scan with diagnostics reports unterminated string" {
+  let result = @moonlexkit.scan_with_diagnostics("name = \"open")
+  assert_true(result.has_errors())
+  assert_eq(result.diagnostics[0].message, "unterminated string literal")
+}
+
+///|
+test "scan with diagnostics reports delimiter balance" {
+  let result = @moonlexkit.scan_with_diagnostics("call(1]")
+  assert_true(result.has_errors())
+  assert_true(result.diagnostics.length() >= 2)
 }
 
 ///|
@@ -158,4 +181,34 @@ test "tokens can be exported as json" {
   assert_true(json.contains("\"kind\":\"identifier\""))
   assert_true(json.contains("\"text\":\"a\""))
   assert_true(json.contains("\"kind\":\"end\""))
+  let string_json = @moonlexkit.tokens_to_json(@moonlexkit.scan("\"Moon\""))
+  assert_true(string_json.contains("\\\"Moon\\\""))
+}
+
+///|
+test "source positions map offsets to line and column" {
+  let source = "one\ntwo"
+  let pos = @moonlexkit.position_at(source, 5)
+  assert_eq(pos.line, 2)
+  assert_eq(pos.column, 2)
+  assert_true(pos.to_json().contains("\"line\":2"))
+  let token = @moonlexkit.scan(source)[1]
+  assert_eq(token.start_position(source).line, 2)
+}
+
+///|
+test "token stats and scan summary explain token streams" {
+  let config = @moonlexkit.LexerConfig::new(keep_trivia=true)
+  let result = @moonlexkit.scan_with_diagnostics(
+    "name = \"Moon\"\n// note\n42",
+    config~,
+  )
+  let stats = @moonlexkit.TokenStats::from_tokens(result.tokens)
+  let summary = result.summary("name = \"Moon\"\n// note\n42")
+  assert_eq(stats.identifiers, 1)
+  assert_eq(stats.strings, 1)
+  assert_eq(summary.comments, 1)
+  assert_eq(summary.lines, 3)
+  assert_true(stats.to_json().contains("\"strings\":1"))
+  assert_true(summary.to_json().contains("\"comments\":1"))
 }

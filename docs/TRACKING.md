@@ -14,6 +14,11 @@
 - 双字符符号
 - 行注释 trivia
 - JSON 导出
+- 字符串字面量扫描
+- 源位置 line/column 映射
+- TokenStats 与 ScanSummary
+- 未闭合字符串和括号不平衡诊断
+- 与已有 lexer / parser 项目的差异说明
 - CLI 演示
 - CI 与协作模板
 
@@ -23,6 +28,7 @@
 2. 支持关键字表和 token kind 扩展策略
 3. 增加大输入扫描 benchmark
 4. 增加 WebAssembly 示例
+5. 增加 token 流差异比较工具
 
 ## 合并请求建议
 
