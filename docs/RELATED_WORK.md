@@ -21,6 +21,7 @@ MoonLexKit 不做 lexer generator，不复刻 MoonBit 语言 parser，也不绑�
 - 源码 offset 到 line/column 的位置映射
 - 未知字符、未闭合字符串和括号不平衡诊断
 - TokenStats 与 ScanSummary，用于调试、测试和 IDE 原型
+- Token 流前后缀差异，用于编辑器增量更新和格式化器回归
 - JSON 输出，便于 CLI、可视化和差异测试
 
 ## 独立价值
@@ -31,5 +32,5 @@ MoonLexKit 更适合作为小型 DSL、配置语言、教学编译器和工具�
 
 - 增加关键字表和 token kind 扩展策略。
 - 增加字符串转义诊断和错误恢复测试。
-- 增加 token 流差异比较，服务格式化器和静态检查工具。
+- 扩展 token 流差异为按行重扫描窗口，服务格式化器和静态检查工具。
 - 增加大输入扫描 benchmark 和 WebAssembly 演示。

@@ -7,7 +7,7 @@ on:
     branches: ["main"]
 
 jobs:
-  moonbit:
+  quality:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -19,8 +19,39 @@ jobs:
       - name: Format check
         run: moon fmt --check
 
-      - name: Run tests
-        run: moon test
+      - name: Check all backends
+        run: moon check --target all
+
+      - name: Inspect package
+        run: moon package --list
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [native, js, wasm, wasm-gc]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MoonBit
+        uses: moonbitlang/setup-moonbit@v1
+
+      - name: Test ${{ matrix.target }}
+        run: moon test --target "${{ matrix.target }}"
+
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MoonBit
+        uses: moonbitlang/setup-moonbit@v1
 
       - name: Run CLI demo
-        run: moon run cmd/main
+        run: moon run cmd/main --target js
+
+      - name: Run deterministic workload
+        run: moon run bench/main --target js

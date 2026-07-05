@@ -23,6 +23,7 @@ MoonLexKit 不绑定某一种具体语言，也不依赖浏览器、文件系统
 - 提供未知字符、未闭合字符串、括号不平衡诊断
 - 提供 `position_at` 与 `Token::start_position`，支持 offset 到 line/column 的映射
 - 提供 `TokenStats` 与 `ScanSummary`，输出 token 流摘要和诊断数量
+- 提供 `diff_tokens`，定位两次扫描之间最小的 Token 变更范围
 - 提供 Token JSON、统计 JSON 和扫描摘要 JSON 导出
 - 附带 CLI JSON 演示、测试和 GitHub Actions CI
 
@@ -31,6 +32,7 @@ MoonLexKit 不绑定某一种具体语言，也不依赖浏览器、文件系统
 ```bash
 moon test
 moon run cmd/main
+moon run bench/main
 ```
 
 ```moonbit nocheck
@@ -59,3 +61,4 @@ let summary = result.summary("name = \"Moon\"")
 - 差异化：不做 lexer generator，不做完整语言 parser，而是聚焦 token 流诊断和轻量解析辅助
 
 更完整的关系说明见 [docs/RELATED_WORK.md](docs/RELATED_WORK.md)。
+可复现测试与工作负载见 [docs/EVIDENCE.md](docs/EVIDENCE.md)。

@@ -1,0 +1,137 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Wyh123456559/moonlexkit"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn count_lines(String) -> Int
+
+pub fn diff_tokens(Array[Token], Array[Token]) -> TokenDiff
+
+pub fn is_ascii_digit(Char) -> Bool
+
+pub fn is_ascii_letter(Char) -> Bool
+
+pub fn is_ascii_whitespace(Char) -> Bool
+
+pub fn is_identifier_part(Char) -> Bool
+
+pub fn is_identifier_start(Char) -> Bool
+
+pub fn position_at(String, Int) -> SourcePosition
+
+pub fn scan(String, config? : LexerConfig) -> Array[Token]
+
+pub fn scan_with_diagnostics(String, config? : LexerConfig) -> LexResult
+
+pub fn tokens_to_json(Array[Token]) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct Diagnostic {
+  message : String
+  start : Int
+  end : Int
+} derive(Eq, @debug.Debug)
+pub fn Diagnostic::new(String, Int, Int) -> Self
+
+pub(all) struct LexResult {
+  tokens : Array[Token]
+  diagnostics : Array[Diagnostic]
+} derive(Eq, @debug.Debug)
+pub fn LexResult::has_errors(Self) -> Bool
+pub fn LexResult::summary(Self, String) -> ScanSummary
+
+pub(all) struct LexerConfig {
+  keep_trivia : Bool
+  emit_end : Bool
+} derive(Eq, @debug.Debug)
+pub fn LexerConfig::default() -> Self
+pub fn LexerConfig::new(keep_trivia? : Bool, emit_end? : Bool) -> Self
+
+pub(all) struct ScanSummary {
+  tokens : Int
+  diagnostics : Int
+  identifiers : Int
+  numbers : Int
+  strings : Int
+  comments : Int
+  unknowns : Int
+  lines : Int
+} derive(Eq, @debug.Debug)
+pub fn ScanSummary::to_json(Self) -> String
+
+pub(all) struct SourcePosition {
+  offset : Int
+  line : Int
+  column : Int
+} derive(Eq, @debug.Debug)
+pub fn SourcePosition::to_json(Self) -> String
+
+pub(all) struct Token {
+  kind : TokenKind
+  text : String
+  start : Int
+  end : Int
+} derive(Eq, @debug.Debug)
+pub fn Token::end_at(Int) -> Self
+pub fn Token::is_trivia(Self) -> Bool
+pub fn Token::length(Self) -> Int
+pub fn Token::new(TokenKind, String, Int, Int) -> Self
+pub fn Token::start_position(Self, String) -> SourcePosition
+pub fn Token::to_json(Self) -> String
+
+pub(all) struct TokenDiff {
+  unchanged_prefix : Int
+  unchanged_suffix : Int
+  removed_tokens : Int
+  inserted_tokens : Int
+  old_start : Int
+  old_end : Int
+  new_start : Int
+  new_end : Int
+} derive(Eq, @debug.Debug)
+pub fn TokenDiff::to_json(Self) -> String
+
+pub(all) enum TokenKind {
+  Identifier
+  Number
+  StringLiteral
+  Symbol
+  Whitespace
+  Comment
+  Unknown
+  End
+} derive(Eq, @debug.Debug)
+pub fn TokenKind::name(Self) -> String
+
+pub(all) struct TokenStats {
+  total : Int
+  identifiers : Int
+  numbers : Int
+  strings : Int
+  symbols : Int
+  trivia : Int
+  unknowns : Int
+} derive(Eq, @debug.Debug)
+pub fn TokenStats::from_tokens(Array[Token]) -> Self
+pub fn TokenStats::to_json(Self) -> String
+
+pub(all) struct TokenStream {
+  tokens : Array[Token]
+  index : Int
+} derive(Eq, @debug.Debug)
+pub fn TokenStream::advance(Self) -> Self
+pub fn TokenStream::consume_kind(Self, TokenKind) -> (Bool, Token, Self)
+pub fn TokenStream::current(Self) -> Token
+pub fn TokenStream::is_at_end(Self) -> Bool
+pub fn TokenStream::matches_kind(Self, TokenKind) -> Bool
+pub fn TokenStream::new(Array[Token]) -> Self
+
+// Type aliases
+
+// Traits
+
