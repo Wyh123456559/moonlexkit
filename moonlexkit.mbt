@@ -74,6 +74,19 @@ pub(all) struct ScanSummary {
 } derive(Eq, Debug)
 
 ///|
+/// Minimal changed region between two token streams.
+pub(all) struct TokenDiff {
+  unchanged_prefix : Int
+  unchanged_suffix : Int
+  removed_tokens : Int
+  inserted_tokens : Int
+  old_start : Int
+  old_end : Int
+  new_start : Int
+  new_end : Int
+} derive(Eq, Debug)
+
+///|
 pub fn Token::new(
   kind : TokenKind,
   text : String,
@@ -250,10 +263,20 @@ fn escape_json(value : String) -> String {
     match value.get_char(i) {
       Some('\\') => buf.write_string("\\\\")
       Some('"') => buf.write_string("\\\"")
+      Some('\b') => buf.write_string("\\b")
+      Some('\u{000C}') => buf.write_string("\\f")
       Some('\n') => buf.write_string("\\n")
       Some('\r') => buf.write_string("\\r")
       Some('\t') => buf.write_string("\\t")
-      Some(ch) => buf.write_char(ch)
+      Some(ch) =>
+        if ch.to_int() < 32 {
+          let digits = "0123456789abcdef"
+          buf.write_string("\\u00")
+          buf.write_char(digits.get_char(ch.to_int() / 16).unwrap())
+          buf.write_char(digits.get_char(ch.to_int() % 16).unwrap())
+        } else {
+          buf.write_char(ch)
+        }
       None => ()
     }
   }
@@ -277,6 +300,80 @@ pub fn tokens_to_json(tokens : Array[Token]) -> String {
   }
   buf.write_char(']')
   buf.to_string()
+}
+
+///|
+fn same_token_shape(left : Token, right : Token) -> Bool {
+  left.kind == right.kind && left.text == right.text
+}
+
+///|
+fn boundary_offset(tokens : Array[Token], index : Int) -> Int {
+  if index < tokens.length() {
+    tokens[index].start
+  } else if tokens.length() > 0 {
+    tokens[tokens.length() - 1].end
+  } else {
+    0
+  }
+}
+
+///|
+/// Finds a minimal token-level edit by trimming equal prefix and suffix runs.
+///
+/// Callers that need whitespace-precise ranges should scan with keep_trivia.
+pub fn diff_tokens(
+  old_tokens : Array[Token],
+  new_tokens : Array[Token],
+) -> TokenDiff {
+  let mut prefix = 0
+  let shared = if old_tokens.length() < new_tokens.length() {
+    old_tokens.length()
+  } else {
+    new_tokens.length()
+  }
+  while prefix < shared &&
+        same_token_shape(old_tokens[prefix], new_tokens[prefix]) {
+    prefix = prefix + 1
+  }
+  let mut suffix = 0
+  while suffix < old_tokens.length() - prefix &&
+        suffix < new_tokens.length() - prefix &&
+        same_token_shape(
+          old_tokens[old_tokens.length() - 1 - suffix],
+          new_tokens[new_tokens.length() - 1 - suffix],
+        ) {
+    suffix = suffix + 1
+  }
+  let removed = old_tokens.length() - prefix - suffix
+  let inserted = new_tokens.length() - prefix - suffix
+  let old_start = boundary_offset(old_tokens, prefix)
+  let new_start = boundary_offset(new_tokens, prefix)
+  let old_end = if removed > 0 {
+    old_tokens[prefix + removed - 1].end
+  } else {
+    old_start
+  }
+  let new_end = if inserted > 0 {
+    new_tokens[prefix + inserted - 1].end
+  } else {
+    new_start
+  }
+  {
+    unchanged_prefix: prefix,
+    unchanged_suffix: suffix,
+    removed_tokens: removed,
+    inserted_tokens: inserted,
+    old_start,
+    old_end,
+    new_start,
+    new_end,
+  }
+}
+
+///|
+pub fn TokenDiff::to_json(self : TokenDiff) -> String {
+  "{\"unchanged_prefix\":\{self.unchanged_prefix},\"unchanged_suffix\":\{self.unchanged_suffix},\"removed_tokens\":\{self.removed_tokens},\"inserted_tokens\":\{self.inserted_tokens},\"old_start\":\{self.old_start},\"old_end\":\{self.old_end},\"new_start\":\{self.new_start},\"new_end\":\{self.new_end}}"
 }
 
 ///|
@@ -443,55 +540,45 @@ fn add_balance_diagnostics(
   tokens : Array[Token],
   diagnostics : Array[Diagnostic],
 ) -> Unit {
-  let mut parens = 0
-  let mut braces = 0
-  let mut brackets = 0
+  let openings : Array[Token] = []
   for token in tokens {
     if token.kind == Symbol {
       match token.text {
-        "(" => parens = parens + 1
-        ")" =>
-          if parens > 0 {
-            parens = parens - 1
-          } else {
-            diagnostics.push(
-              Diagnostic::new("unmatched closing paren", token.start, token.end),
-            )
+        "(" | "{" | "[" => openings.push(token)
+        ")" | "}" | "]" => {
+          let expected = match token.text {
+            ")" => "("
+            "}" => "{"
+            _ => "["
           }
-        "{" => braces = braces + 1
-        "}" =>
-          if braces > 0 {
-            braces = braces - 1
-          } else {
+          if openings.length() == 0 {
             diagnostics.push(
-              Diagnostic::new("unmatched closing brace", token.start, token.end),
+              Diagnostic::new(
+                "unmatched closing delimiter",
+                token.start,
+                token.end,
+              ),
             )
-          }
-        "[" => brackets = brackets + 1
-        "]" =>
-          if brackets > 0 {
-            brackets = brackets - 1
+          } else if openings[openings.length() - 1].text == expected {
+            ignore(openings.pop())
           } else {
             diagnostics.push(
               Diagnostic::new(
-                "unmatched closing bracket",
+                "mismatched closing delimiter",
                 token.start,
                 token.end,
               ),
             )
           }
+        }
         _ => ()
       }
     }
   }
-  if parens > 0 {
-    diagnostics.push(Diagnostic::new("unclosed paren", 0, 0))
-  }
-  if braces > 0 {
-    diagnostics.push(Diagnostic::new("unclosed brace", 0, 0))
-  }
-  if brackets > 0 {
-    diagnostics.push(Diagnostic::new("unclosed bracket", 0, 0))
+  for opening in openings {
+    diagnostics.push(
+      Diagnostic::new("unclosed delimiter", opening.start, opening.end),
+    )
   }
 }
 

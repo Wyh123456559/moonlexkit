@@ -114,6 +114,19 @@ test "scan with diagnostics reports delimiter balance" {
   let result = @moonlexkit.scan_with_diagnostics("call(1]")
   assert_true(result.has_errors())
   assert_true(result.diagnostics.length() >= 2)
+  assert_eq(result.diagnostics[0].message, "mismatched closing delimiter")
+  assert_eq(result.diagnostics[1].start, 4)
+}
+
+///|
+test "delimiter diagnostics reject crossed nesting" {
+  let result = @moonlexkit.scan_with_diagnostics("([)]")
+  assert_true(result.has_errors())
+  assert_eq(result.diagnostics.length(), 2)
+  assert_eq(result.diagnostics[0].message, "mismatched closing delimiter")
+  assert_eq(result.diagnostics[0].start, 2)
+  assert_eq(result.diagnostics[1].message, "unclosed delimiter")
+  assert_eq(result.diagnostics[1].start, 0)
 }
 
 ///|
@@ -183,6 +196,54 @@ test "tokens can be exported as json" {
   assert_true(json.contains("\"kind\":\"end\""))
   let string_json = @moonlexkit.tokens_to_json(@moonlexkit.scan("\"Moon\""))
   assert_true(string_json.contains("\\\"Moon\\\""))
+}
+
+///|
+test "token json escapes every low control character" {
+  let token = @moonlexkit.Token::new(StringLiteral, "\b\u{000C}\u{0001}", 0, 3)
+  let json = token.to_json()
+  assert_true(json.contains("\\b"))
+  assert_true(json.contains("\\f"))
+  assert_true(json.contains("\\u0001"))
+}
+
+///|
+test "token diff isolates one replacement" {
+  let old_tokens = @moonlexkit.scan("name = 41")
+  let new_tokens = @moonlexkit.scan("name = 42")
+  let diff = @moonlexkit.diff_tokens(old_tokens, new_tokens)
+  assert_eq(diff.unchanged_prefix, 2)
+  assert_eq(diff.unchanged_suffix, 1)
+  assert_eq(diff.removed_tokens, 1)
+  assert_eq(diff.inserted_tokens, 1)
+  assert_eq(diff.old_start, 7)
+  assert_eq(diff.old_end, 9)
+  assert_eq(diff.new_start, 7)
+  assert_eq(diff.new_end, 9)
+}
+
+///|
+test "token diff reports insertion with trivia precision" {
+  let config = @moonlexkit.LexerConfig::new(keep_trivia=true)
+  let old_tokens = @moonlexkit.scan("left right", config~)
+  let new_tokens = @moonlexkit.scan("left middle right", config~)
+  let diff = @moonlexkit.diff_tokens(old_tokens, new_tokens)
+  assert_eq(diff.removed_tokens, 0)
+  assert_eq(diff.inserted_tokens, 2)
+  assert_eq(diff.unchanged_prefix, 2)
+  assert_eq(diff.old_start, 5)
+  assert_eq(diff.new_start, 5)
+  assert_true(diff.to_json().contains("\"inserted_tokens\":2"))
+}
+
+///|
+test "token diff is empty for identical streams" {
+  let tokens = @moonlexkit.scan("same")
+  let diff = @moonlexkit.diff_tokens(tokens, tokens)
+  assert_eq(diff.unchanged_prefix, tokens.length())
+  assert_eq(diff.unchanged_suffix, 0)
+  assert_eq(diff.removed_tokens, 0)
+  assert_eq(diff.inserted_tokens, 0)
 }
 
 ///|
