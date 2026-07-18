@@ -20,6 +20,8 @@ pub fn is_identifier_part(Char) -> Bool
 
 pub fn is_identifier_start(Char) -> Bool
 
+pub fn parse_assignments(String) -> AssignmentParseResult
+
 pub fn position_at(String, Int) -> SourcePosition
 
 pub fn scan(String, config? : LexerConfig) -> Array[Token]
@@ -31,6 +33,18 @@ pub fn tokens_to_json(Array[Token]) -> String
 // Errors
 
 // Types and methods
+pub(all) struct Assignment {
+  name : String
+  value : Token
+  start : Int
+  end : Int
+} derive(Eq, @debug.Debug)
+
+pub(all) struct AssignmentParseResult {
+  assignments : Array[Assignment]
+  diagnostics : Array[Diagnostic]
+} derive(Eq, @debug.Debug)
+
 pub(all) struct Diagnostic {
   message : String
   start : Int
@@ -48,9 +62,10 @@ pub fn LexResult::summary(Self, String) -> ScanSummary
 pub(all) struct LexerConfig {
   keep_trivia : Bool
   emit_end : Bool
+  keywords : Array[String]
 } derive(Eq, @debug.Debug)
 pub fn LexerConfig::default() -> Self
-pub fn LexerConfig::new(keep_trivia? : Bool, emit_end? : Bool) -> Self
+pub fn LexerConfig::new(keep_trivia? : Bool, emit_end? : Bool, keywords? : Array[String]) -> Self
 
 pub(all) struct ScanSummary {
   tokens : Int
@@ -98,6 +113,7 @@ pub fn TokenDiff::to_json(Self) -> String
 
 pub(all) enum TokenKind {
   Identifier
+  Keyword
   Number
   StringLiteral
   Symbol

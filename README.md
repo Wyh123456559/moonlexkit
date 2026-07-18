@@ -1,5 +1,29 @@
 # MoonLexKit
 
+## Install and run
+
+```bash
+moon add Wyh123456559/moonlexkit
+```
+
+```mbt check
+import {
+  "Wyh123456559/moonlexkit" @lex,
+}
+
+///|
+test {
+  let config = @lex.LexerConfig::new(keywords=["let"])
+  let parsed = @lex.parse_assignments("port = 8080; name = \"moon\";")
+  assert_eq(parsed.assignments.length(), 2)
+  assert_true(@lex.scan("let port", config~)[0].kind == @lex.Keyword)
+}
+```
+
+MoonLexKit is a portable lexer and recoverable configuration-DSL parser for
+small DSLs, formatter tooling, editor diagnostics, and incremental token views.
+It is intentionally not a full language parser or lexer generator.
+
 MoonLexKit 是面向 MoonBit 的词法扫描、诊断恢复与 Token 流差异基础库，适用于小型 DSL、配置语言、格式化器、静态检查器和编辑器原型。
 
 ## 核心价值

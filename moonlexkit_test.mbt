@@ -45,6 +45,39 @@ test "lexer config has predictable defaults" {
 }
 
 ///|
+test "keywords and extended number literals are configurable" {
+  let config = @moonlexkit.LexerConfig::new(keywords=["let", "true"])
+  let tokens = @moonlexkit.scan("let size = 0xCAFE 12.5e-2 1_000 true", config~)
+  assert_true(tokens[0].kind == Keyword)
+  assert_eq(tokens[3].text, "0xCAFE")
+  assert_eq(tokens[4].text, "12.5e-2")
+  assert_eq(tokens[5].text, "1_000")
+  assert_true(tokens[6].kind == Keyword)
+}
+
+///|
+test "nested block comments are trivia and report unterminated input" {
+  let config = @moonlexkit.LexerConfig::new(keep_trivia=true)
+  let clean = @moonlexkit.scan("a /* outer /* inner */ done */ b", config~)
+  assert_true(clean[2].kind == Comment)
+  assert_true(clean[2].text.has_suffix("*/"))
+  let invalid = @moonlexkit.scan_with_diagnostics("a /* open", config~)
+  assert_true(invalid.has_errors())
+  assert_eq(invalid.diagnostics[0].message, "unterminated block comment")
+}
+
+///|
+test "assignment parser recovers after an invalid statement" {
+  let parsed = @moonlexkit.parse_assignments(
+    "port = 8080; broken + ; name = \"moon\";",
+  )
+  assert_eq(parsed.assignments.length(), 2)
+  assert_eq(parsed.assignments[0].name, "port")
+  assert_eq(parsed.assignments[1].value.text, "\"moon\"")
+  assert_eq(parsed.diagnostics.length(), 1)
+}
+
+///|
 test "scan identifiers numbers symbols and end token" {
   let tokens = @moonlexkit.scan("foo 123 + bar")
   assert_eq(tokens.length(), 5)

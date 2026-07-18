@@ -1,6 +1,7 @@
 ///|
 pub(all) enum TokenKind {
   Identifier
+  Keyword
   Number
   StringLiteral
   Symbol
@@ -29,6 +30,7 @@ pub(all) struct SourcePosition {
 pub(all) struct LexerConfig {
   keep_trivia : Bool
   emit_end : Bool
+  keywords : Array[String]
 } derive(Eq, Debug)
 
 ///|
@@ -87,6 +89,22 @@ pub(all) struct TokenDiff {
 } derive(Eq, Debug)
 
 ///|
+/// One `name = literal` statement accepted by the small configuration DSL.
+pub(all) struct Assignment {
+  name : String
+  value : Token
+  start : Int
+  end : Int
+} derive(Eq, Debug)
+
+///|
+/// Recoverable result of parsing configuration assignments.
+pub(all) struct AssignmentParseResult {
+  assignments : Array[Assignment]
+  diagnostics : Array[Diagnostic]
+} derive(Eq, Debug)
+
+///|
 pub fn Token::new(
   kind : TokenKind,
   text : String,
@@ -115,6 +133,7 @@ pub fn Token::is_trivia(self : Token) -> Bool {
 pub fn TokenKind::name(self : TokenKind) -> String {
   match self {
     Identifier => "identifier"
+    Keyword => "keyword"
     Number => "number"
     StringLiteral => "string"
     Symbol => "symbol"
@@ -134,8 +153,9 @@ pub fn SourcePosition::to_json(self : SourcePosition) -> String {
 pub fn LexerConfig::new(
   keep_trivia? : Bool = false,
   emit_end? : Bool = true,
+  keywords? : Array[String] = [],
 ) -> LexerConfig {
-  { keep_trivia, emit_end }
+  { keep_trivia, emit_end, keywords }
 }
 
 ///|
@@ -232,6 +252,7 @@ pub fn TokenStats::from_tokens(tokens : Array[Token]) -> TokenStats {
   for token in tokens {
     match token.kind {
       Identifier => identifiers = identifiers + 1
+      Keyword => identifiers = identifiers + 1
       Number => numbers = numbers + 1
       StringLiteral => strings = strings + 1
       Symbol => symbols = symbols + 1
@@ -480,6 +501,111 @@ fn is_line_comment_start(source : String, index : Int) -> Bool {
 }
 
 ///|
+fn is_block_comment_start(source : String, index : Int) -> Bool {
+  match (source.get_char(index), source.get_char(index + 1)) {
+    (Some('/'), Some('*')) => true
+    _ => false
+  }
+}
+
+///|
+/// Scans nested block comments and returns the end of the available source.
+/// An unterminated comment is diagnosed by `scan_with_diagnostics`.
+fn scan_block_comment(source : String, start : Int) -> Int {
+  let mut index = start + 2
+  let mut depth = 1
+  while index < source.length() && depth > 0 {
+    if is_block_comment_start(source, index) {
+      depth = depth + 1
+      index = index + 2
+    } else {
+      match (source.get_char(index), source.get_char(index + 1)) {
+        (Some('*'), Some('/')) => {
+          depth = depth - 1
+          index = index + 2
+        }
+        _ => index = index + 1
+      }
+    }
+  }
+  index
+}
+
+///|
+fn is_hex_digit(ch : Char) -> Bool {
+  is_ascii_digit(ch) || ch is ('a'..='f' | 'A'..='F')
+}
+
+///|
+/// Scans decimal fractions/exponents and `0x` hexadecimal integers.
+fn scan_number_literal(source : String, start : Int) -> Int {
+  let mut index = start
+  match (source.get_char(start), source.get_char(start + 1)) {
+    (Some('0'), Some('x' | 'X')) => {
+      index = start + 2
+      while index < source.length() {
+        match source.get_char(index) {
+          Some(ch) if is_hex_digit(ch) || ch == '_' => index = index + 1
+          _ => return index
+        }
+      }
+      return index
+    }
+    _ => ()
+  }
+  while index < source.length() {
+    match source.get_char(index) {
+      Some(ch) if is_ascii_digit(ch) || ch == '_' => index = index + 1
+      _ => break
+    }
+  }
+  match (source.get_char(index), source.get_char(index + 1)) {
+    (Some('.'), Some(ch)) if is_ascii_digit(ch) => {
+      index = index + 2
+      while index < source.length() {
+        match source.get_char(index) {
+          Some(ch) if is_ascii_digit(ch) || ch == '_' => index = index + 1
+          _ => break
+        }
+      }
+    }
+    _ => ()
+  }
+  match source.get_char(index) {
+    Some('e' | 'E') => {
+      let sign = match source.get_char(index + 1) {
+        Some('+' | '-') => 1
+        _ => 0
+      }
+      match source.get_char(index + 1 + sign) {
+        Some(ch) if is_ascii_digit(ch) => {
+          index = index + 2 + sign
+          while index < source.length() {
+            match source.get_char(index) {
+              Some(ch) if is_ascii_digit(ch) || ch == '_' => index = index + 1
+              _ => break
+            }
+          }
+        }
+        _ => ()
+      }
+    }
+    _ => ()
+  }
+  index
+}
+
+///|
+fn is_keyword(text : String, keywords : Array[String]) -> Bool {
+  for keyword in keywords {
+    if text == keyword {
+      return true
+    }
+  }
+  false
+}
+
+///|
 fn scan_line_comment(source : String, start : Int) -> Int {
   let mut index = start
   while index < source.length() {
@@ -602,13 +728,23 @@ pub fn scan(
       }
       Some(ch) if is_identifier_start(ch) => {
         let end = scan_while(source, index, is_identifier_part)
+        let text = substring(source, index, end)
         tokens.push(
-          Token::new(Identifier, substring(source, index, end), index, end),
+          Token::new(
+            if is_keyword(text, config.keywords) {
+              Keyword
+            } else {
+              Identifier
+            },
+            text,
+            index,
+            end,
+          ),
         )
         index = end
       }
       Some(ch) if is_ascii_digit(ch) => {
-        let end = scan_while(source, index, is_ascii_digit)
+        let end = scan_number_literal(source, index)
         tokens.push(
           Token::new(Number, substring(source, index, end), index, end),
         )
@@ -623,6 +759,15 @@ pub fn scan(
       }
       Some(_) if is_line_comment_start(source, index) => {
         let end = scan_line_comment(source, index)
+        if config.keep_trivia {
+          tokens.push(
+            Token::new(Comment, substring(source, index, end), index, end),
+          )
+        }
+        index = end
+      }
+      Some(_) if is_block_comment_start(source, index) => {
+        let end = scan_block_comment(source, index)
         if config.keep_trivia {
           tokens.push(
             Token::new(Comment, substring(source, index, end), index, end),
@@ -698,8 +843,70 @@ pub fn scan_with_diagnostics(
           tokens[i].end,
         ),
       )
+    } else if tokens[i].kind == Comment &&
+      tokens[i].text.has_prefix("/*") &&
+      !tokens[i].text.has_suffix("*/") {
+      diagnostics.push(
+        Diagnostic::new(
+          "unterminated block comment",
+          tokens[i].start,
+          tokens[i].end,
+        ),
+      )
     }
   }
   add_balance_diagnostics(tokens, diagnostics)
   { tokens, diagnostics }
+}
+
+///|
+/// Parses a small configuration DSL made of `name = literal;` statements.
+/// Invalid statements are skipped to the next semicolon so later statements
+/// remain available to editors and configuration tooling.
+pub fn parse_assignments(source : String) -> AssignmentParseResult {
+  let result = scan_with_diagnostics(source)
+  let assignments : Array[Assignment] = []
+  let diagnostics = result.diagnostics
+  let tokens = result.tokens
+  let mut index = 0
+  while index < tokens.length() && tokens[index].kind != End {
+    let start = tokens[index].start
+    if tokens[index].kind != Identifier {
+      diagnostics.push(
+        Diagnostic::new("expected assignment name", start, tokens[index].end),
+      )
+    } else if index + 2 >= tokens.length() ||
+      tokens[index + 1].kind != Symbol ||
+      tokens[index + 1].text != "=" ||
+      !(tokens[index + 2].kind
+      is (Identifier | Number | StringLiteral | Keyword)) {
+      diagnostics.push(
+        Diagnostic::new("expected `name = literal`", start, tokens[index].end),
+      )
+    } else {
+      let value = tokens[index + 2]
+      assignments.push({
+        name: tokens[index].text,
+        value,
+        start,
+        end: value.end,
+      })
+      index = index + 3
+      if index < tokens.length() &&
+        tokens[index].kind == Symbol &&
+        tokens[index].text == ";" {
+        index = index + 1
+      }
+      continue
+    }
+    while index < tokens.length() &&
+          !(tokens[index].kind == Symbol && tokens[index].text == ";") &&
+          tokens[index].kind != End {
+      index = index + 1
+    }
+    if index < tokens.length() && tokens[index].kind != End {
+      index = index + 1
+    }
+  }
+  { assignments, diagnostics }
 }

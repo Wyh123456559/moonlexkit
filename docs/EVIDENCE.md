@@ -1,38 +1,31 @@
-# 验收证据
+# Acceptance evidence
 
-## 自动化检查
+## Current verification commands
 
 ```bash
 moon fmt --check
-moon check --target all
-moon test --target wasm
-moon test --target wasm-gc
+moon check --deny-warn --target all
+moon info && git diff --exit-code -- '*.mbti'
+moon test --deny-warn --target all
 moon run cmd/main --target js
 moon run bench/main --target js
-moon package --list
-moon info
-git diff --check
 ```
 
-当前 28 项测试覆盖扫描配置、字符串转义、注释 trivia、双字符符号、TokenStream、源码位置、诊断恢复、交叉分隔符、JSON 控制字符、统计摘要和 Token 流差异。
+MoonBit 0.10.4 no longer exposes `fmt/info --deny-warn`; CI detects those
+legacy flags when available and otherwise uses the current non-mutating
+equivalents.
 
-## 固定工作负载
+## Functional scope
 
-`bench/main` 生成 10,000 行 DSL 文本，完整扫描两份输入，并在第 5,000 行制造单点修改。输出源码长度、Token 数量、诊断数量和最小差异范围，用于比较不同 MoonBit 后端是否得到相同结果。
+MoonLexKit scans configurable keywords, identifiers, decimal/hexadecimal
+numbers, strings, line and nested block comments, whitespace, and symbols. It
+maps offsets to line/columns, produces diagnostics, computes token diffs, and
+parses recoverable `name = literal;` configuration statements. It is not a
+complete parser generator or a replacement for the MoonBit language parser.
 
-该工作负载用于规模与确定性回归，不以单台机器耗时宣称跨平台速度。
+## Reproducible workload
 
-固定输出：
-
-```text
-lines=10000
-source_units=237780
-tokens=80001
-diagnostics=0
-unchanged_prefix=40004
-unchanged_suffix=39996
-removed_tokens=1
-inserted_tokens=1
-```
-
-单点修改只产生一个删除 Token 和一个插入 Token，证明差异计算不会把整个文件误判为变化。
+`moon run bench/main --target js` scans two deterministic 10,000-line DSL
+inputs (237,780 source units / 80,001 tokens) with a single edit. The expected
+token diff contains one removed and one inserted token. This is a deterministic
+regression workload, not a cross-machine latency claim.

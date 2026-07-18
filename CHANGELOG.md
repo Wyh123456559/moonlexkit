@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 - 2026-07-18
+
+- Added configurable keyword classification, extended numeric literals, and
+  nested block-comment scanning.
+- Added recoverable configuration-DSL assignment parsing and its test coverage.
+- Updated README, roadmap, benchmark evidence, executable package metadata,
+  and OSC 2026 CI gates for MoonBit 0.10.4.
+
 ## 0.2.0
 
 - 正式发布可诊断词法扫描与最小 Token 变化区间。

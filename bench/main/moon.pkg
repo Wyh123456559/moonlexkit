@@ -2,6 +2,4 @@ import {
   "Wyh123456559/moonlexkit" @lex,
 }
 
-options(
-  "is-main": true,
-)
+pkgtype(kind: "executable")
